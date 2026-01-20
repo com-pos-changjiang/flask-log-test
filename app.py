@@ -27,13 +27,13 @@ def index():
 @app.route('/trigger-info')
 def trigger_info():
     """触发一条 INFO 级别日志"""
-    app.logger.info("这是一条后端触发的 INFO 日志！")
+    app.logger.info("这是一条后端触发的 INFO 日志！测试")
     return jsonify({"status": "success", "message": "INFO 日志已发送"})
 
 @app.route('/trigger-warning')
 def trigger_warning():
     """触发一条 WARNING 级别日志"""
-    app.logger.warning("⚠️ 警告：这是一条 WARNING 级别的日志！")
+    app.logger.warning("⚠️ 警告：这是一条 WARNING 级别的日志！测试警告日志")
     return jsonify({"status": "success", "message": "WARNING 日志已发送"})
 
 @app.route('/trigger-error')
