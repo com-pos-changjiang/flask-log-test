@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask 实时日志监控系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .controls h2 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: 1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .btn-info {
+            background: #3498db;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+        }
+
+        .btn-error {
+            background: #e74c3c;
+        }
+
+        .btn-batch {
+            background: #9b59b6;
+        }
+
+        .btn-clear {
+            background: #95a5a6;
+        }
+
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .log-container::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 5px;
+        }
+
+        .log-entry {
+            padding: 5px 10px;
+            margin: 5px 0;
+            border-left: 3px solid #555;
+            background: #252526;
+            border-radius: 3px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-entry.INFO {
+            border-left-color: #3498db;
+            color: #61afef;
+        }
+
+        .log-entry.WARNING {
+            border-left-color: #f39c12;
+            color: #e5c07b;
+        }
+
+        .log-entry.ERROR {
+            border-left-color: #e74c3c;
+            color: #e06c75;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            background: #e8f4f8;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .status.connected {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .status.disconnected {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .log-stats {
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Flask 实时日志监控系统</h1>
+            <p>基于 Flask-SocketIO 的实时日志推送与显示</p>
+        </div>
+
+        <div class="controls">
+            <h2>📝 触发日志</h2>
+            <div class="button-group">
+                <button class="btn-info" onclick="triggerLog('info')">发送 INFO 日志</button>
+                <button class="btn-warning" onclick="triggerLog('warning')">发送 WARNING 日志</button>
+                <button class="btn-error" onclick="triggerLog('error')">发送 ERROR 日志</button>
+                <button class="btn-batch" onclick="triggerBatchLogs()">批量日志测试</button>
+                <button class="btn-clear" onclick="clearLogs()">清除日志</button>
+            </div>
+        </div>
+
+        <div class="log-container" id="log-container">
+            <div class="log-entry" style="color: #61afef; border-left-color: #61afef;">
+                📌 等待日志消息... 点击上方按钮触发日志
+            </div>
+        </div>
+
+        <div class="log-stats">
+            <div class="stat-item">
+                <div class="stat-number" id="info-count" style="color: #3498db;">0</div>
+                <div class="stat-label">INFO</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="warning-count" style="color: #f39c12;">0</div>
+                <div class="stat-label">WARNING</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="error-count" style="color: #e74c3c;">0</div>
+                <div class="stat-label">ERROR</div>
+            </div>
+        </div>
+
+        <div class="status" id="connection-status">
+            连接状态: <span class="disconnected">⚠️ 未连接</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const container = document.getElementById('log-container');
+        const connectionStatus = document.getElementById('connection-status');
+        
+        // 日志计数器
+        let logCounts = {
+            INFO: 0,
+            WARNING: 0,
+            ERROR: 0
+        };
+
+        // SocketIO 连接成功
+        socket.on('connect', () => {
+            connectionStatus.innerHTML = '连接状态: <span class="connected">✅ 已连接</span>';
+            addLogEntry('系统信息', 'SocketIO 连接已建立', 'INFO');
+        });
+
+        // SocketIO 断开连接
+        socket.on('disconnect', () => {
+            connectionStatus.innerHTML = '连接状态: <span class="disconnected">⚠️ 未连接</span>';
+        });
+
+        // 接收日志消息
+        socket.on('log_message', (msg) => {
+            const data = msg.data;
+            const logLevel = extractLogLevel(data);
+            addLogEntry('', data, logLevel);
+        });
+
+        // 清除日志
+        socket.on('clear_logs', () => {
+            container.innerHTML = '<div class="log-entry" style="color: #61afef; border-left-color: #61afef;">📌 日志已清除，等待新的日志消息...</div>';
+            logCounts = { INFO: 0, WARNING: 0, ERROR: 0 };
+            updateStats();
+        });
+
+        // 提取日志级别
+        function extractLogLevel(logData) {
+            if (logData.includes('INFO')) return 'INFO';
+            if (logData.includes('WARNING')) return 'WARNING';
+            if (logData.includes('ERROR')) return 'ERROR';
+            return 'INFO';
+        }
+
+        // 添加日志条目
+        function addLogEntry(title, content, level) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${level}`;
+            entry.textContent = content;
+            container.appendChild(entry);
+            
+            // 自动滚动到底部
+            container.scrollTop = container.scrollHeight;
+            
+            // 更新统计
+            if (logCounts[level] !== undefined) {
+                logCounts[level]++;
+                updateStats();
+            }
+        }
+
+        // 更新统计数字
+        function updateStats() {
+            document.getElementById('info-count').textContent = logCounts.INFO;
+            document.getElementById('warning-count').textContent = logCounts.WARNING;
+            document.getElementById('error-count').textContent = logCounts.ERROR;
+        }
+
+        // 触发日志
+        async function triggerLog(type) {
+            try {
+                const response = await fetch(`/trigger-${type}`);
+                const data = await response.json();
+                console.log(data.message);
+            } catch (error) {
+                console.error('发送失败:', error);
+            }
+        }
+
+        // 批量日志测试
+        async function triggerBatchLogs() {
+            try {
+                const response = await fetch('/batch-logs');
+                const data = await response.json();
+                console.log(data.message);
+            } catch (error) {
+                console.error('批量日志发送失败:', error);
+            }
+        }
+
+        // 清除日志
+        async function clearLogs() {
+            try {
+                const response = await fetch('/clear-logs');
+                const data = await response.json();
+                console.log(data.message);
+            } catch (error) {
+                console.error('清除失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>
